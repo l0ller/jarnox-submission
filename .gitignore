@@ -1,95 +1,16 @@
-# ----------------------------
 # Python
-# ----------------------------
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.so
-*.egg-info/
-.eggs/
-
-# Virtual environments
 .venv/
-venv/
-ENV/
-env/
+__pycache__/
+*.pyc
 
-# Python build artifacts
-build/
-dist/
-pip-wheel-metadata/
-
-# ----------------------------
-# Environment variables
-# ----------------------------
-.env
-.env.*
-*.env
-
-# ----------------------------
-# Logs & cache
-# ----------------------------
-*.log
-.cache/
-.pytest_cache/
-.mypy_cache/
-
-# ----------------------------
-# OS-specific
-# ----------------------------
+# OS / Editor
 .DS_Store
-Thumbs.db
-
-# ----------------------------
-# IDE / Editor
-# ----------------------------
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# ----------------------------
-# Jupyter / Experiments
-# ----------------------------
-.ipynb_checkpoints/
+# Git
+.git/
+.gitignore
 
-# ----------------------------
-# Frontend
-# ----------------------------
-frontend/node_modules/
-frontend/dist/
-
-# ----------------------------
 # Docker
-# ----------------------------
-*.tar
-docker-compose.override.yml
-
-# ----------------------------
-# Data (IMPORTANT)
-# ----------------------------
-# Ignore raw stock data (large & regenerable)
-data/*.csv
-
-# If you want to keep sample data, whitelist:
-!data/sample.csv
-
-# ----------------------------
-# Temporary files
-# ----------------------------
-tmp/
-temp/
-*.bak
-*.tmp
-
-# ----------------------------
-# Coverage
-# ----------------------------
-.coverage
-htmlcov/
-
-# ----------------------------
-# Uvicorn / FastAPI
-# ----------------------------
-*.sqlite3
+*.log
