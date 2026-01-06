@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stock Dashboard</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* ---------- Base ---------- */
+        body {
+            margin: 0;
+            font-family: "Inter", Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            background: #f9fafb;
+        }
+
+        /* ---------- Sidebar ---------- */
+        .sidebar {
+            width: 260px;
+            background: #111827;
+            color: white;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar h2 {
+            margin: 0 0 10px 0;
+            font-size: 20px;
+        }
+
+        .sidebar h3 {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar input,
+        .sidebar select,
+        .sidebar button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 6px;
+            border: none;
+            font-size: 14px;
+        }
+
+        .sidebar input,
+        .sidebar select {
+            background: #1f2933;
+            color: white;
+        }
+
+        .sidebar input::placeholder {
+            color: #9ca3af;
+        }
+
+        .sidebar button {
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .sidebar button:hover {
+            background: #1d4ed8;
+        }
+
+        /* ---------- Main ---------- */
+        .main {
+            flex: 1;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ---------- Header ---------- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        #title {
+            margin: 0;
+            font-size: 22px;
+            color: #111827;
+        }
+
+        /* ---------- Controls ---------- */
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .controls button {
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: none;
+            background: #e5e7eb;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .controls button:hover {
+            background: #d1d5db;
+        }
+
+        /* ---------- Chart Card ---------- */
+        .chart-card {
+            background: white;
+            padding: 16px;
+            border-radius: 10px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+            flex: 1;
+        }
+
+        canvas {
+            max-height: 500px;
+        }
+
+        /* ---------- Utility ---------- */
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ---------------- Sidebar ---------------- -->
+<div class="sidebar">
+    <h2>Companies</h2>
+
+    <select id="symbolSelect"></select>
+
+    <h3 style="margin-top:20px;">Compare</h3>
+    <select id="compare1"></select>
+    <select id="compare2"></select>
+    <input id="newSymbol" placeholder="Enter symbol (e.g. TSLA)">
+    <button onclick="addNewSymbol()">Add</button>
+
+    <button onclick="compareStocks()">Compare</button>
+</div>
+
+<!-- ---------------- Main ---------------- -->
+<div class="main">
+    <div class="header">
+        <h2 id="title">📈 Stock Price Dashboard</h2>
+
+        <div class="header-actions">
+            <button class="secondary" onclick="refreshAll()">🔄 Refresh All Data</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="primary" onclick="loadData(30)">Last 30 Days</button>
+        <button class="primary" onclick="loadData(90)">Last 90 Days</button>
+    </div>
+
+    <div class="chart-card">
+        <canvas id="priceChart"></canvas>
+    </div>
+</div>
+
+<script>
+
+const API_BASE = "";
+
+let chart = null;
+let currentMode = "single"; // "single" | "compare"
+let compareSymbols = { s1: null, s2: null };
+/* ----------------- NewSymbol ----------------- */
+async function addNewSymbol() {
+    const symbol = document.getElementById("newSymbol").value.toUpperCase();
+    if (!symbol) return;
+
+    const res = await fetch(`${API_BASE}/symbols/download?symbol=${symbol}`, {
+        method: "POST"
+    });
+
+    if (!res.ok) {
+        alert("Failed to download symbol");
+        return;
+    }
+
+    alert(`Symbol ${symbol} added successfully`);
+    location.reload();
+}
+async function refreshSymbol(symbol) {
+    await fetch(`${API_BASE}/symbols/refresh?symbol=${symbol}`, {
+        method: "POST"
+    });
+    await loadStock(symbol);
+}
+
+async function refreshAll() {
+    if (!confirm("Refresh data for all symbols?")) return;
+
+    const res = await fetch(`${API_BASE}/symbols/refresh-all`, {
+        method: "POST"
+    });
+
+    if (!res.ok) {
+        alert("Failed to refresh data");
+        return;
+    }
+
+    alert("All symbols refreshed successfully");
+    location.reload();
+}
+
+
+/* ---------------- Load Companies ---------------- */
+async function loadCompanies() {
+    const res = await fetch(`${API_BASE}/companies`);
+    const companies = await res.json();
+
+    const selects = [
+        document.getElementById("symbolSelect"),
+        document.getElementById("compare1"),
+        document.getElementById("compare2")
+    ];
+
+    selects.forEach(sel => {
+        sel.innerHTML = "";
+        companies.forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c;
+            opt.textContent = c;
+            sel.appendChild(opt.cloneNode(true));
+        });
+    });
+
+    document.getElementById("symbolSelect").onchange = () => {
+    currentMode = "single";
+    loadData(30);
+};
+}
+
+/* ---------------- Load Single Stock ---------------- */
+async function loadData(days) {
+    if (currentMode === "compare") {
+        await loadCompareData(days);
+        return;
+    }
+
+    const symbol = document.getElementById("symbolSelect").value;
+    if (!symbol) return;
+
+    const res = await fetch(`${API_BASE}/data/${symbol}`);
+    let data = await res.json();
+    data = data.slice(-days);
+
+    const labels = data.map(d => d.Date);
+    const prices = data.map(d => d.Close);
+
+    const datasets = [
+        {
+            label: symbol,
+            data: prices,
+            borderWidth: 2,
+            tension: 0.3
+        }
+    ];
+
+    // 🔮 FETCH PREDICTION
+    try {
+        const predRes = await fetch(`${API_BASE}/predict/${symbol}`);
+        if (predRes.ok) {
+            const pred = await predRes.json();
+
+            datasets.push({
+                label: `${symbol} (Prediction)`,
+                data: [...prices, pred.predicted_close],
+                borderDash: [6, 6],
+                borderWidth: 2
+            });
+
+            labels.push("Next Day");
+        }
+    } catch (e) {
+        console.warn("Prediction failed", e);
+    }
+
+    document.getElementById("title").innerText = `${symbol} (${days} days)`;
+
+    renderChart(labels, datasets);
+}
+
+
+/* ---------------- Compare Stocks ---------------- */
+async function compareStocks() {
+    const s1 = document.getElementById("compare1").value;
+    const s2 = document.getElementById("compare2").value;
+
+    if (!s1 || !s2 || s1 === s2) return;
+
+    currentMode = "compare";
+    compareSymbols = { s1, s2 };
+
+    await loadCompareData(30);
+}
+
+
+async function loadCompareData(days) {
+    const { s1, s2 } = compareSymbols;
+
+    const [r1, r2] = await Promise.all([
+        fetch(`${API_BASE}/data/${s1}`),
+        fetch(`${API_BASE}/data/${s2}`)
+    ]);
+
+    const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
+
+    const data1 = d1.slice(-days);
+    const data2 = d2.slice(-days);
+
+    const labels = data1.map(d => d.Date);
+
+    renderChart(labels, [
+        {
+            label: s1,
+            data: data1.map(d => d.Close),
+            borderWidth: 2,
+            tension: 0.3
+        },
+        {
+            label: s2,
+            data: data2.map(d => d.Close),
+            borderWidth: 2,
+            tension: 0.3
+        }
+    ]);
+
+    document.getElementById("title").innerText = `${s1} vs ${s2} (${days} days)`;
+}
+
+/* ---------------- Chart Rendering ---------------- */
+function renderChart(labels, datasets) {
+    const ctx = document.getElementById("priceChart").getContext("2d");
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels,
+            datasets
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: "index",
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: "top"
+                },
+                tooltip: {
+                    enabled: true
+                }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: "Date" }
+                },
+                y: {
+                    title: { display: true, text: "Close Price" }
+                }
+            }
+        }
+    });
+}
+
+
+/* ---------------- Init ---------------- */
+loadCompanies();
+</script>
+
+</body>
+</html>
